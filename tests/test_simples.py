@@ -108,3 +108,38 @@ async def test_get_simples_status_valida_offline_sem_chamar_api(client, cnpj_inv
         with pytest.raises(FiscalNotFoundError):
             await client.get_simples_status(cnpj_invalido)
         mock_http_client.assert_not_called()
+
+
+# Formato real do /cnpj/v1 da BrasilAPI (fonte do regime desde que se descobriu
+# que /simples/v1 nao existe e respondia 404 para qualquer CNPJ).
+RESPOSTA_CNPJ_V1 = {
+    "cnpj": "45882222000113",
+    "opcao_pelo_simples": True,
+    "data_opcao_pelo_simples": "2021-01-01",
+    "data_exclusao_do_simples": None,
+    "opcao_pelo_mei": False,
+    "data_opcao_pelo_mei": None,
+    "data_exclusao_do_mei": None,
+}
+
+
+@pytest.mark.asyncio
+async def test_get_simples_status_usa_endpoint_cnpj_v1(client, cnpj_digits):
+    with patch("mcp_fiscal_brasil._core.http.HTTPClient.get") as mock_get:
+        mock_get.return_value = RESPOSTA_CNPJ_V1
+        result = await client.get_simples_status(cnpj_digits)
+        mock_get.assert_called_once_with(f"/cnpj/v1/{cnpj_digits}")
+        assert result.simples_nacional is True
+        assert result.data_opcao is not None and result.data_opcao.isoformat() == "2021-01-01"
+        assert result.data_exclusao is None
+        assert result.mei is False
+        assert result.fonte_confirmada is True
+
+
+@pytest.mark.asyncio
+async def test_get_simples_status_sem_campo_de_opcao_nao_confirma(client, cnpj_digits):
+    with patch("mcp_fiscal_brasil._core.http.HTTPClient.get") as mock_get:
+        mock_get.return_value = {"cnpj": cnpj_digits, "razao_social": "X"}
+        result = await client.get_simples_status(cnpj_digits)
+        assert result.simples_nacional is False
+        assert result.fonte_confirmada is False

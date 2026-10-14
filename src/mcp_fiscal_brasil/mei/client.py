@@ -3,6 +3,7 @@ from datetime import date
 from mcp_fiscal_brasil._core import FiscalNotFoundError, HTTPClient, get_logger, settings
 from mcp_fiscal_brasil._core.errors import FiscalHTTPError
 from mcp_fiscal_brasil.shared.validators import normalizar_cnpj
+from mcp_fiscal_brasil.simples.client import extrair_regime
 
 from .schemas import MEIStatus
 
@@ -35,26 +36,14 @@ class MEIClient:
         cnpj_clean = normalizar_cnpj(cnpj)
         async with self._http_client() as client:
             try:
-                data = await client.get(f"/simples/v1/{cnpj_clean}")
-
-                simples = data.get("simples") if isinstance(data.get("simples"), dict) else data
-                simei = data.get("simei") if isinstance(data.get("simei"), dict) else data
-
-                if not isinstance(simples, dict):
-                    simples = {}
-                if not isinstance(simei, dict):
-                    simei = {}
-
+                data = await client.get(f"/cnpj/v1/{cnpj_clean}")
+                regime = extrair_regime(data)
                 return MEIStatus(
                     cnpj=cnpj_clean,
-                    mei=simei.get("optante", data.get("mei", False)),
-                    data_opcao_mei=self._parse_date(
-                        simei.get("data_opcao", data.get("data_opcao_simei"))
-                    ),
-                    data_exclusao_mei=self._parse_date(
-                        simei.get("data_exclusao", data.get("data_exclusao_simei"))
-                    ),
-                    simples_nacional=simples.get("optante", data.get("simples_nacional", False)),
+                    mei=regime["mei"],
+                    data_opcao_mei=self._parse_date(regime["data_opcao_mei"]),
+                    data_exclusao_mei=self._parse_date(regime["data_exclusao_mei"]),
+                    simples_nacional=regime["simples_nacional"],
                 )
             except FiscalHTTPError as exc:
                 if exc.status_code == 404:
