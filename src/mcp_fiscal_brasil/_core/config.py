@@ -1,5 +1,8 @@
 """Application configuration for mcp-fiscal-brasil."""
 
+import ipaddress
+import os
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +30,9 @@ class Settings(BaseSettings):
     # Libera baixar_nfe_distribuicao/manifestar_nfe em modo remoto. So tem efeito
     # com MCP_FISCAL_AUTH_TOKEN definido.
     mcp_fiscal_permitir_certificado_remoto: bool = False
+    # Restringe a execucao a esta maquina: so stdio ou HTTP/SSE em loopback
+    # (127.0.0.1, ::1, localhost). Qualquer bind em interface de rede e recusado.
+    mcp_fiscal_somente_local: bool = False
     brasilapi_base_url: str = "https://brasilapi.com.br/api"
     receita_base_url: str = "https://receitaws.com.br/v1"
 
@@ -51,7 +57,14 @@ class Settings(BaseSettings):
     nfe_emitente_cnpj: str = ""
     nfe_ambiente: str = "producao"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # ".env" e relativo ao diretorio de trabalho, que para clientes MCP (Claude
+    # Desktop/Code) costuma ser outro. MCP_FISCAL_ENV_FILE aponta um caminho
+    # absoluto; quando definido, tem precedencia sobre o .env do diretorio atual.
+    model_config = SettingsConfigDict(
+        env_file=tuple(f for f in (".env", os.environ.get("MCP_FISCAL_ENV_FILE")) if f),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @field_validator("cpfcnpj_base_url")
     @classmethod
@@ -71,6 +84,27 @@ class Settings(BaseSettings):
         return normalizado
 
 
+def host_e_local(host: str) -> bool:
+    """True quando o host so aceita conexoes desta maquina (loopback)."""
+    if host.strip().lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip().strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def exigir_execucao_local(transporte: str, host: str) -> None:
+    """Com MCP_FISCAL_SOMENTE_LOCAL, recusa expor o servidor fora do loopback."""
+    if not settings.mcp_fiscal_somente_local or transporte == "stdio":
+        return
+    if not host_e_local(host):
+        raise SystemExit(
+            f"MCP_FISCAL_SOMENTE_LOCAL ativo: recusando escutar em '{host}'. "
+            "Use o transporte stdio ou HOST=127.0.0.1."
+        )
+
+
 settings = Settings()
 
-__all__ = ["Settings", "settings"]
+__all__ = ["Settings", "exigir_execucao_local", "host_e_local", "settings"]

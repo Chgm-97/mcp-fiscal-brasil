@@ -17,6 +17,7 @@ from starlette.responses import JSONResponse
 
 from . import __version__
 from ._core import settings
+from ._core.config import exigir_execucao_local
 from .agentic import (
     analyze_cnpj_compliance,
     compare_tax_regimes,
@@ -1217,6 +1218,8 @@ def main() -> None:
     args = parser.parse_args()
 
     logger.info("Iniciando MCP Fiscal Brasil v%s (transport=%s)", __version__, args.transport)
+
+    exigir_execucao_local(args.transport, args.host)
 
     if args.transport == "stdio":
         app.run(transport="stdio")

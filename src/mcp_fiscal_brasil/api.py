@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from . import __version__
 from ._core import FiscalHTTPError, get_logger
-from ._core.config import settings
+from ._core.config import exigir_execucao_local, settings
 from .agentic import (
     analyze_cnpj_compliance,
     compare_tax_regimes,
@@ -551,4 +551,5 @@ def run() -> None:
     # deploy (container/proxy), nao de um default aberto aqui.
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
+    exigir_execucao_local("http", host)
     uvicorn.run("mcp_fiscal_brasil.api:app", host=host, port=port, reload=False)
