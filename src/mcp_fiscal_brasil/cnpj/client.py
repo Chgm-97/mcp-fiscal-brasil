@@ -37,6 +37,22 @@ def _parse_data(valor: str | None) -> date | None:
     return None
 
 
+_CNAE_NAO_INFORMADO = "00.00-0-00"
+
+
+def _logradouro_completo(tipo: str | None, logradouro: str | None) -> str | None:
+    """Junta tipo e nome do logradouro ("ALAMEDA" + "DOS GUAIOS").
+
+    A BrasilAPI separa o tipo em ``descricao_tipo_de_logradouro``; sem ele o
+    endereco sai incompleto e diverge do retornado pela ReceitaWS.
+    """
+    if not logradouro:
+        return logradouro
+    if tipo and not logradouro.upper().startswith(tipo.upper() + " "):
+        return f"{tipo} {logradouro}"
+    return logradouro
+
+
 class CNPJClient:
     """Cliente para busca de dados de CNPJ em fontes publicas."""
 
@@ -136,15 +152,20 @@ class CNPJClient:
             )
 
         atividades_secundarias = []
+        # A BrasilAPI usa as chaves sem acento ("codigo"/"descricao").
         for cnae in data.get("cnaes_secundarios") or []:
-            if cnae.get("código") and cnae.get("descrição"):
+            codigo = cnae.get("codigo")
+            descricao = cnae.get("descricao")
+            if codigo and descricao:
                 atividades_secundarias.append(
-                    AtividadeCNAE(código=str(cnae["código"]), descrição=cnae["descrição"])
+                    AtividadeCNAE(código=str(codigo), descrição=descricao)
                 )
 
         endereco = Endereco(
-            logradouro=data.get("logradouro"),
-            número=data.get("número"),
+            logradouro=_logradouro_completo(
+                data.get("descricao_tipo_de_logradouro"), data.get("logradouro")
+            ),
+            número=data.get("numero"),
             complemento=data.get("complemento"),
             bairro=data.get("bairro"),
             municipio=data.get("municipio"),
@@ -198,14 +219,16 @@ class CNPJClient:
             )
             break
 
+        # A ReceitaWS devolve "00.00-0-00 / Não informada" quando nao ha secundarias.
         atividades_secundarias = [
             AtividadeCNAE(código=a.get("code", ""), descrição=a.get("text", ""))
             for a in data.get("atividades_secundarias") or []
+            if a.get("code") and a.get("code") != _CNAE_NAO_INFORMADO
         ]
 
         endereco = Endereco(
             logradouro=data.get("logradouro"),
-            número=data.get("número"),
+            número=data.get("numero"),
             complemento=data.get("complemento"),
             bairro=data.get("bairro"),
             municipio=data.get("municipio"),

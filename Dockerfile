@@ -2,16 +2,16 @@
 # Multi-stage para imagem final enxuta com uv.
 #
 # Build:
-#   docker build -t mcp-fiscal-brasil:0.2.0 .
+#   docker build -t mcp-fiscal-brasil .
 #
 # Run (servidor MCP stdio):
-#   docker run --rm -i mcp-fiscal-brasil:0.2.0
+#   docker run --rm -i mcp-fiscal-brasil
 #
 # Run (REST API + Web UI):
-#   docker run --rm -p 8000:8000 mcp-fiscal-brasil:0.2.0 mcp-fiscal-api
+#   docker run --rm -p 8000:8000 mcp-fiscal-brasil mcp-fiscal-api
 #
 # Run (MCP HTTP transport):
-#   docker run --rm -p 8000:8000 mcp-fiscal-brasil:0.2.0 mcp-fiscal-brasil --transport http
+#   docker run --rm -p 8000:8000 mcp-fiscal-brasil mcp-fiscal-brasil --transport http
 #
 # Variaveis de ambiente uteis:
 #   MCP_FISCAL_HTTP_TIMEOUT=30

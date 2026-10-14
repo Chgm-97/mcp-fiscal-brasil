@@ -31,13 +31,20 @@ class EmpresaClient:
             # CNPJ é o dado primário, se falhar, propagamos o erro
             raise cnpj_data
 
-        simples_nacional = False
-        mei = False
-        if not isinstance(simples_data, BaseException):
+        # Sem confirmacao da fonte, o regime fica desconhecido (None) em vez de
+        # "nao optante": um False aqui ja levou empresa do Simples a ser
+        # reportada como fora do regime.
+        simples_nacional: bool | None = None
+        mei: bool | None = None
+        aviso = None
+        if isinstance(simples_data, BaseException):
+            logger.warning("empresa_simples_fetch_failed", cnpj=cnpj, error=str(simples_data))
+            aviso = "Nao foi possivel consultar o regime (Simples Nacional/MEI); tente novamente."
+        elif not simples_data.fonte_confirmada:
+            aviso = "A fonte nao confirmou a opcao pelo Simples Nacional/MEI deste CNPJ."
+        else:
             simples_nacional = simples_data.simples_nacional
             mei = simples_data.mei
-        else:
-            logger.warning("empresa_simples_fetch_failed", cnpj=cnpj, error=str(simples_data))
 
         return EmpresaInfo(
             cnpj=cnpj_data.cnpj,
@@ -51,4 +58,5 @@ class EmpresaClient:
             atividade_principal=cnpj_data.atividade_principal,
             atividades_secundarias=cnpj_data.atividades_secundarias,
             endereco=cnpj_data.endereco,
+            aviso=aviso,
         )

@@ -63,5 +63,28 @@ async def test_get_empresa_simples_fails(client):
 
         result = await client.get_empresa("123")
         assert result.cnpj == "123"
-        assert result.simples_nacional is False
-        assert result.mei is False
+        assert result.simples_nacional is None
+        assert result.mei is None
+        assert result.aviso
+
+
+@pytest.mark.asyncio
+async def test_get_empresa_regime_nao_confirmado_fica_nulo(client):
+    with (
+        patch("mcp_fiscal_brasil.cnpj.client.CNPJClient.consultar") as mock_cnpj,
+        patch("mcp_fiscal_brasil.simples.client.SimplesClient.get_simples_status") as mock_simples,
+    ):
+        mock_cnpj.return_value = CNPJResponse(
+            cnpj="123",
+            razao_social="Teste",
+            situacao_cadastral="ATIVA",
+            origem="BrasilAPI",
+            natureza_juridica="Teste",
+        )
+        mock_simples.return_value = SimplesStatus(
+            cnpj="123", simples_nacional=False, mei=False, fonte_confirmada=False
+        )
+        result = await client.get_empresa("123")
+        assert result.simples_nacional is None
+        assert result.mei is None
+        assert result.aviso

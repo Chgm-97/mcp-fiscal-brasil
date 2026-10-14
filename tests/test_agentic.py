@@ -519,3 +519,35 @@ async def test_tool_analyze_cnpj_compliance_aceita_mascara_padrao() -> None:
 
     assert resposta["cnpj"] == "33000167000101"
     mock_tool.assert_awaited_once_with("33.000.167/0001-01")
+
+
+@pytest.mark.asyncio
+async def test_compliance_regime_nao_confirmado_nao_vira_nao_optante():
+    """Sem confirmacao da fonte (404 ou falha), o achado e 'nao confirmado',
+    nunca 'Nao optante pelo Simples Nacional'."""
+    with (
+        patch("mcp_fiscal_brasil.agentic.compliance.CNPJClient") as mock_cnpj_class,
+        patch("mcp_fiscal_brasil.agentic.compliance.SimplesClient") as mock_simples_class,
+        patch("mcp_fiscal_brasil.agentic.compliance.MEIClient") as mock_mei_class,
+    ):
+        cnpj_inst = MagicMock()
+        cnpj_inst.consultar = AsyncMock(return_value=_cnpj_ativo())
+        mock_cnpj_class.return_value = cnpj_inst
+
+        simples_inst = MagicMock()
+        simples_inst.get_simples_status = AsyncMock(
+            return_value=SimplesStatus(
+                cnpj="12345678000190", simples_nacional=False, mei=False, fonte_confirmada=False
+            )
+        )
+        mock_simples_class.return_value = simples_inst
+
+        mei_inst = MagicMock()
+        mei_inst.get_mei_status = AsyncMock(side_effect=Exception("offline"))
+        mock_mei_class.return_value = mei_inst
+
+        report = await analyze_cnpj_compliance("12.345.678/0001-90")
+
+    titulos = [a.titulo for a in report.achados if a.categoria == "regime_tributario"]
+    assert titulos == ["Regime tributario nao confirmado"]
+    assert "Simples Nacional" not in report.fontes_consultadas

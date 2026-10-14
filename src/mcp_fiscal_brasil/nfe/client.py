@@ -205,7 +205,7 @@ class NFEClient:
 
         return NFeResponse(
             chave_acesso=chave,
-            número=str(data.get("número", "")),
+            número=str(data.get("numero", "")),
             serie=str(data.get("serie", "")),
             situacao=data.get("situacao"),
         )

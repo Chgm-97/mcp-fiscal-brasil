@@ -12,9 +12,9 @@ class BaseResponse(BaseModel):
     """Resposta base para todas as ferramentas MCP."""
 
     sucesso: bool = True
+    # Pydantic v2 ja serializa datetime em ISO 8601 no modo JSON; o antigo
+    # json_encoders era redundante e esta deprecado (removido no Pydantic v3).
     consultado_em: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat()}}
 
 
 class ErrorResponse(BaseResponse):

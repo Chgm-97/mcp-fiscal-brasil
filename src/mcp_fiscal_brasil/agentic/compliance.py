@@ -138,7 +138,17 @@ async def analyze_cnpj_compliance(cnpj: str) -> ComplianceReport:
     fontes_ok.append(getattr(cnpj_data, "origem", "Receita"))
 
     # Regime tributário
-    if simples_data is not None:
+    if simples_data is None or not simples_data.fonte_confirmada:
+        achados.append(
+            ComplianceFinding(
+                categoria="regime_tributario",
+                severidade="baixo",
+                titulo="Regime tributario nao confirmado",
+                detalhe="A fonte nao confirmou a opcao pelo Simples Nacional/MEI.",
+                recomendacao="Confirmar o regime no portal do Simples Nacional",
+            )
+        )
+    else:
         fontes_ok.append("Simples Nacional")
         if not simples_data.simples_nacional:
             achados.append(
