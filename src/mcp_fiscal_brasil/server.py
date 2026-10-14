@@ -4,11 +4,14 @@ Servidor MCP Fiscal Brasil.
 Registra todas as ferramentas fiscais e expõe via protocolo MCP (Model Context Protocol).
 """
 
+import hmac
 import logging
 import unicodedata
+from pathlib import Path
 from typing import Any, Literal
 
 from fastmcp import FastMCP
+from fastmcp.server.auth.providers.debug import DebugTokenVerifier
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -102,6 +105,54 @@ def _normalizar_e_validar_cnpjs(cnpjs: list[str]) -> list[str]:
     return normalizados
 
 
+# Ligado por main() quando o transporte nao e stdio.
+_transporte_remoto = False
+
+
+def _modo_remoto() -> bool:
+    return _transporte_remoto or settings.mcp_fiscal_modo_remoto
+
+
+def _caminho_entrada(caminho: str, *, label: str) -> str:
+    """Em modo remoto, confina caminhos de arquivo a MCP_FISCAL_FILE_BASE_DIR.
+
+    No modo stdio (uso local) o caminho segue sem restricao, como antes. Em
+    http/sse qualquer cliente da rede chama as ferramentas, entao um caminho
+    arbitrario permitiria ler arquivos do servidor. Caminhos relativos sao
+    resolvidos a partir do diretorio base; symlinks sao seguidos antes da checagem.
+    """
+    if not _modo_remoto():
+        return caminho
+    base_dir = Path(settings.mcp_fiscal_file_base_dir).expanduser().resolve()
+    informado = Path(caminho).expanduser()
+    if not informado.is_absolute():
+        informado = base_dir / informado
+    resolvido = informado.resolve()
+    if not resolvido.is_relative_to(base_dir):
+        raise PermissionError(
+            f"{label} fora do diretorio permitido. Em modo remoto, apenas arquivos dentro "
+            "de MCP_FISCAL_FILE_BASE_DIR podem ser lidos."
+        )
+    return str(resolvido)
+
+
+def _exigir_certificado_permitido() -> None:
+    """Bloqueia ferramentas com certificado A1 em modo remoto, salvo opt-in autenticado.
+
+    Sem isso, qualquer cliente HTTP poderia manifestar NF-e (ex: Desconhecimento da
+    Operacao) ou baixar documentos fiscais usando o certificado do operador.
+    """
+    if not _modo_remoto():
+        return
+    if settings.mcp_fiscal_permitir_certificado_remoto and settings.mcp_fiscal_auth_token:
+        return
+    raise PermissionError(
+        "Ferramentas com certificado A1 estao desativadas em modo remoto (http/sse). "
+        "Para liberar, defina MCP_FISCAL_AUTH_TOKEN e "
+        "MCP_FISCAL_PERMITIR_CERTIFICADO_REMOTO=true, ou use o transporte stdio."
+    )
+
+
 def _credenciais_certificado(caminho: str | None, senha: str | None) -> tuple[str, str]:
     """Resolve caminho e senha do certificado A1, com fallback para variaveis de ambiente.
 
@@ -109,6 +160,9 @@ def _credenciais_certificado(caminho: str | None, senha: str | None) -> tuple[st
     parametro da ferramenta e nunca passa pelo modelo nem pelo historico da conversa.
     Valores passados explicitamente tem precedencia (compatibilidade).
     """
+    _exigir_certificado_permitido()
+    if caminho:
+        caminho = _caminho_entrada(caminho, label="Certificado A1")
     caminho_final = (caminho or settings.nfe_certificado_path).strip()
     senha_final = senha or settings.nfe_certificado_senha
     if not caminho_final or not senha_final:
@@ -1099,7 +1153,7 @@ async def tool_consultar_empresas_lote(
 )
 async def tool_validate_nfe_full(xml_path: str) -> dict[str, Any]:
     """Validacao consolidada de NFe."""
-    resultado = await validate_nfe_full(xml_path)
+    resultado = await validate_nfe_full(_caminho_entrada(xml_path, label="Arquivo XML"))
     return resultado.model_dump(mode="json", exclude_none=True)
 
 
@@ -1113,7 +1167,7 @@ async def tool_validate_nfe_full(xml_path: str) -> dict[str, Any]:
 )
 async def tool_summarize_sped(file_path: str) -> dict[str, Any]:
     """Sumarizacao executiva de arquivo SPED."""
-    resultado = await summarize_sped(file_path)
+    resultado = await summarize_sped(_caminho_entrada(file_path, label="Arquivo SPED"))
     return resultado.model_dump(mode="json", exclude_none=True)
 
 
@@ -1167,7 +1221,32 @@ def main() -> None:
     if args.transport == "stdio":
         app.run(transport="stdio")
     else:
+        _configurar_modo_remoto()
         app.run(transport=args.transport, host=args.host, port=args.port)
+
+
+def _configurar_modo_remoto() -> None:
+    """Ativa as protecoes do modo remoto e, se houver token, exige Bearer nas requisicoes."""
+    global _transporte_remoto
+    _transporte_remoto = True
+
+    token = settings.mcp_fiscal_auth_token
+    if token:
+        esperado = token.encode()
+        app.auth = DebugTokenVerifier(
+            validate=lambda recebido: hmac.compare_digest(recebido.encode(), esperado),
+            client_id="mcp-fiscal-brasil",
+        )
+        logger.info("Autenticacao Bearer ativada (MCP_FISCAL_AUTH_TOKEN)")
+    else:
+        logger.warning(
+            "Transporte remoto SEM autenticacao: qualquer cliente que alcance esta porta "
+            "pode chamar as ferramentas. Defina MCP_FISCAL_AUTH_TOKEN para exigir um token."
+        )
+    if settings.mcp_fiscal_permitir_certificado_remoto and not token:
+        logger.warning(
+            "MCP_FISCAL_PERMITIR_CERTIFICADO_REMOTO ignorado: exige MCP_FISCAL_AUTH_TOKEN."
+        )
 
 
 if __name__ == "__main__":

@@ -14,6 +14,19 @@ class Settings(BaseSettings):
     mcp_fiscal_http_timeout: float = 30.0
     mcp_fiscal_max_retries: int = 3
     mcp_fiscal_file_base_dir: str = "~/.local/share/mcp-fiscal-brasil/files"
+
+    # Modo remoto do servidor MCP (transportes http/sse/streamable-http). Ativado
+    # automaticamente por main() quando o transporte nao e stdio; esta variavel
+    # forca o modo para quem sobe o app por outro caminho (ex: uvicorn/fastmcp run).
+    # Em modo remoto: caminhos de arquivo ficam confinados a MCP_FISCAL_FILE_BASE_DIR
+    # e as ferramentas que usam certificado A1 ficam bloqueadas por padrao.
+    mcp_fiscal_modo_remoto: bool = False
+    # Token Bearer exigido nos transportes HTTP do servidor MCP. Vazio = sem
+    # autenticacao (apenas para uso em rede confiavel).
+    mcp_fiscal_auth_token: str = ""
+    # Libera baixar_nfe_distribuicao/manifestar_nfe em modo remoto. So tem efeito
+    # com MCP_FISCAL_AUTH_TOKEN definido.
+    mcp_fiscal_permitir_certificado_remoto: bool = False
     brasilapi_base_url: str = "https://brasilapi.com.br/api"
     receita_base_url: str = "https://receitaws.com.br/v1"
 

@@ -89,6 +89,24 @@ Qualquer cliente compatível com MCP funciona. O servidor expoe via stdio por pa
 mcp-fiscal-brasil --transport http --port 8000
 ```
 
+### Segurança no modo remoto (http/sse)
+
+Fora do stdio, qualquer cliente que alcance a porta pode chamar as ferramentas. Por isso, em modo remoto o servidor:
+
+- **Confina caminhos de arquivo** (`validate_nfe_full`, `summarize_sped`, `caminho_certificado`) ao diretório `MCP_FISCAL_FILE_BASE_DIR`. Caminhos fora dele são recusados.
+- **Desativa as ferramentas com certificado A1** (`baixar_nfe_distribuicao`, `manifestar_nfe`), a menos que haja autenticação **e** opt-in explícito.
+
+| Variável | Efeito |
+|---|---|
+| `MCP_FISCAL_AUTH_TOKEN` | Exige `Authorization: Bearer <token>` em todas as requisições MCP. Use um valor longo e aleatório. |
+| `MCP_FISCAL_PERMITIR_CERTIFICADO_REMOTO=true` | Libera as ferramentas com certificado A1. Só tem efeito com `MCP_FISCAL_AUTH_TOKEN` definido. |
+| `MCP_FISCAL_FILE_BASE_DIR` | Diretório de onde arquivos podem ser lidos (padrão `~/.local/share/mcp-fiscal-brasil/files`). |
+| `MCP_FISCAL_MODO_REMOTO=true` | Força o modo remoto quando o app é servido por outro caminho (ex: `fastmcp run`, uvicorn). |
+
+```bash
+MCP_FISCAL_AUTH_TOKEN="$(openssl rand -hex 32)" mcp-fiscal-brasil --transport http --port 8000
+```
+
 ## Cache em produção
 
 Em produção, prefira `sqlite` ou `redis`:
