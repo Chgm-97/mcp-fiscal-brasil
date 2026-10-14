@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from . import __version__
+from ._core import settings
 from .agentic import (
     analyze_cnpj_compliance,
     compare_tax_regimes,
@@ -99,6 +100,24 @@ def _normalizar_e_validar_cnpjs(cnpjs: list[str]) -> list[str]:
         )
 
     return normalizados
+
+
+def _credenciais_certificado(caminho: str | None, senha: str | None) -> tuple[str, str]:
+    """Resolve caminho e senha do certificado A1, com fallback para variaveis de ambiente.
+
+    Preferir NFE_CERTIFICADO_PATH / NFE_CERTIFICADO_SENHA: assim a senha nao e um
+    parametro da ferramenta e nunca passa pelo modelo nem pelo historico da conversa.
+    Valores passados explicitamente tem precedencia (compatibilidade).
+    """
+    caminho_final = (caminho or settings.nfe_certificado_path).strip()
+    senha_final = senha or settings.nfe_certificado_senha
+    if not caminho_final or not senha_final:
+        raise ValueError(
+            "Certificado A1 nao configurado. Defina NFE_CERTIFICADO_PATH e "
+            "NFE_CERTIFICADO_SENHA no ambiente do servidor MCP (recomendado, para a senha "
+            "nao passar pelo modelo) ou informe caminho_certificado e senha."
+        )
+    return caminho_final, senha_final
 
 
 app = FastMCP(
@@ -460,10 +479,10 @@ async def tool_validar_assinatura_nfe(
     ),
 )
 async def tool_baixar_nfe_distribuicao(
-    caminho_certificado: str,
-    senha: str,
     cnpj_cpf: str,
     uf: str,
+    caminho_certificado: str | None = None,
+    senha: str | None = None,
     modo: str = "distNSU",
     ultimo_nsu: str = "0",
     nsu: str | None = None,
@@ -482,8 +501,10 @@ async def tool_baixar_nfe_distribuicao(
     disponivel. Use manifestar_nfe() apos obter o resNFe.
 
     Args:
-        caminho_certificado: Caminho absoluto para o arquivo .pfx ou .p12.
-        senha: Senha do certificado. Nunca logada ou incluida em excecoes.
+        caminho_certificado: Caminho absoluto para o .pfx/.p12. Opcional: se omitido, usa
+            NFE_CERTIFICADO_PATH do ambiente do servidor.
+        senha: Senha do certificado. Opcional e DESACONSELHADO como parametro (passa pelo
+            modelo): se omitida, usa NFE_CERTIFICADO_SENHA do ambiente. Nunca logada.
         cnpj_cpf: CNPJ (14 dig) ou CPF (11 dig) do autor da consulta.
         uf: Sigla da UF do autor (ex: "SP") ou codigo IBGE (ex: "35").
         modo: "distNSU" (incremental), "consNSU" (NSU especifico) ou
@@ -498,6 +519,7 @@ async def tool_baixar_nfe_distribuicao(
         dict com ultimo_nsu, max_nsu e documentos (lista com nsu, tipo, schema,
         chave e resumo de cada documento retornado).
     """
+    caminho_certificado, senha = _credenciais_certificado(caminho_certificado, senha)
     resultado: DistribuicaoResult = await baixar_nfe_distribuicao(
         caminho_certificado=caminho_certificado,
         senha=senha,
@@ -548,9 +570,9 @@ async def tool_baixar_nfe_distribuicao(
 async def tool_manifestar_nfe(
     chave: str,
     tipo_evento: str,
-    caminho_certificado: str,
-    senha: str,
     cnpj_cpf: str,
+    caminho_certificado: str | None = None,
+    senha: str | None = None,
     uf: str = "91",
     numero_sequencia: int = 1,
     justificativa: str | None = None,
@@ -572,8 +594,10 @@ async def tool_manifestar_nfe(
     Args:
         chave: Chave de acesso de 44 digitos da NF-e.
         tipo_evento: Codigo do evento ("210200", "210210", "210220" ou "210240").
-        caminho_certificado: Caminho absoluto para o arquivo .pfx/.p12.
-        senha: Senha do certificado A1. Nunca logada ou incluida em excecoes.
+        caminho_certificado: Caminho absoluto para o .pfx/.p12. Opcional: se omitido, usa
+            NFE_CERTIFICADO_PATH do ambiente do servidor.
+        senha: Senha do certificado A1. Opcional e DESACONSELHADO como parametro (passa
+            pelo modelo): se omitida, usa NFE_CERTIFICADO_SENHA do ambiente. Nunca logada.
         cnpj_cpf: CNPJ (14 dig) ou CPF (11 dig) do destinatario.
         uf: UF do autor. Default "91" = AN (Ambiente Nacional) para manifestacao.
         numero_sequencia: Numero sequencial do evento para esta chave (1 a 20).
@@ -585,6 +609,7 @@ async def tool_manifestar_nfe(
         dict com sucesso (bool), chave, tipo_evento, numero_protocolo,
         codigo_retorno e motivo retornados pela SEFAZ.
     """
+    caminho_certificado, senha = _credenciais_certificado(caminho_certificado, senha)
     resultado: ManifestacaoResult = await manifestar_nfe(
         chave=chave,
         tipo_evento=tipo_evento,
