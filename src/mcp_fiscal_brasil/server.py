@@ -172,18 +172,18 @@ async def tool_consultar_cnpj(cnpj: str) -> dict[str, Any]:
         "Parâmetros: nome (obrigatório), uf (sigla do estado, opcional)."
     ),
 )
-async def tool_listar_cnpjs_por_nome(nome: str, uf: str | None = None) -> list[dict[str, str]]:
+async def tool_listar_cnpjs_por_nome(nome: str, uf: str | None = None) -> dict[str, Any]:
     """Busca empresas pelo nome empresarial ou razao social.
 
     A busca textual por nome de empresa nao e coberta por APIs publicas gratuitas, entao
-    esta ferramenta retorna um aviso orientando o uso de consultar_cnpj com o CNPJ exato.
+    esta ferramenta retorna suportado=False e orienta o uso de consultar_cnpj com o CNPJ exato.
 
     Args:
         nome: Nome empresarial ou parte da razao social a procurar.
         uf: Sigla do estado para restringir a busca (ex.: "SP", "MG"). Opcional.
 
     Returns:
-        list de dicts; atualmente contem um aviso de funcionalidade limitada.
+        dict com suportado (False), status, resultados (vazio), motivo e alternativa.
     """
     return await listar_cnpjs_por_nome(nome, uf)
 
@@ -792,7 +792,7 @@ async def tool_validar_evento_esocial(xml_conteudo: str) -> dict[str, Any]:
         "Fornece URLs de emissão e verificação e alternativas para automação."
     ),
 )
-async def tool_consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
+async def tool_consultar_certidao_federal(cnpj_cpf: str) -> dict[str, Any]:
     """Orienta a obtencao da Certidao Negativa de Debitos federais (CND da RFB/PGFN) por CPF ou CNPJ.
 
     Detecta o tipo de documento, valida o numero e retorna as URLs oficiais de emissao e verificacao,
@@ -814,7 +814,7 @@ async def tool_consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
         "para um CNPJ. Fornece URL do portal da Caixa e alternativas para automação."
     ),
 )
-async def tool_consultar_certidao_fgts(cnpj: str) -> dict[str, str]:
+async def tool_consultar_certidao_fgts(cnpj: str) -> dict[str, Any]:
     """Orienta a obtencao do Certificado de Regularidade do FGTS (CRF) por CNPJ.
 
     Valida o CNPJ e retorna a URL de consulta no portal da Caixa, o Conectividade Social e

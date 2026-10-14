@@ -1,10 +1,12 @@
 """Ferramentas MCP para certidões negativas de débito."""
 
+from typing import Any
+
 from ..shared.exceptions import ValidationError
 from ..shared.validators import normalizar_cnpj, validate_cnpj_qualquer, validate_cpf
 
 
-async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
+async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, Any]:
     """
     Orienta sobre como consultar a Certidão Negativa de Débitos (CND) na Receita Federal.
 
@@ -50,6 +52,7 @@ async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
     return {
         "tipo_documento": tipo_doc,
         "documento": cnpj_cpf,
+        "suportado": False,
         "status": "consulta_manual_necessaria",
         "motivo": (
             "A Receita Federal não disponibiliza API pública para emissão automática de CND. "
@@ -67,7 +70,7 @@ async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
     }
 
 
-async def consultar_certidao_fgts(cnpj: str) -> dict[str, str]:
+async def consultar_certidao_fgts(cnpj: str) -> dict[str, Any]:
     """
     Orienta sobre como consultar a Certidão de Regularidade do FGTS (CRF).
 
@@ -88,6 +91,7 @@ async def consultar_certidao_fgts(cnpj: str) -> dict[str, str]:
     return {
         "documento": cnpj,
         "orgao": "Caixa Econômica Federal - FGTS",
+        "suportado": False,
         "status": "consulta_manual_necessaria",
         "url_consulta": "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf",
         "url_conectividade_social": "https://conectividade.caixa.gov.br/",

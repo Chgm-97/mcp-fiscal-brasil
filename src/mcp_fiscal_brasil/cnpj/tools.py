@@ -1,5 +1,7 @@
 """Ferramentas MCP para consulta de CNPJ."""
 
+from typing import Any
+
 from mcp_fiscal_brasil._core import FiscalValidationError, get_logger
 
 from ..shared.exceptions import ValidationError as SharedValidationError
@@ -63,26 +65,32 @@ async def consultar_cnpj(cnpj: str) -> CNPJResponse:
     return await _client.consultar(cnpj_normalizado)
 
 
-async def listar_cnpjs_por_nome(nome: str, uf: str | None = None) -> list[dict[str, str]]:
+async def listar_cnpjs_por_nome(nome: str, uf: str | None = None) -> dict[str, Any]:
     """
-    Busca empresas pelo nome ou razão social.
+    Busca empresas pelo nome ou razão social (funcionalidade NÃO suportada).
 
-    Retorna uma lista simplificada com CNPJ e razão social.
-    Nota: esta funcionalidade depende de APIs de terceiros com disponibilidade variável.
+    APIs públicas gratuitas não cobrem busca textual por nome. Em vez de uma lista
+    com um item de aviso (que um cliente poderia tratar como resultado), retorna um
+    objeto explícito com ``suportado=False`` e ``resultados`` vazio.
 
     Args:
         nome: Nome ou parte da razão social da empresa.
         uf: Sigla do estado para filtrar (ex: 'SP', 'MG'). Opcional.
 
     Returns:
-        Lista de dicionários com 'cnpj' e 'razao_social'.
+        dict com suportado (False), status, resultados (lista vazia), motivo e
+        alternativa.
     """
     logger.info("cnpj_name_lookup_limited", nome=nome, uf=uf)
-    return [
-        {
-            "aviso": (
-                "A busca por nome de empresa requer acesso a APIs pagas ou "
-                "ao portal da Receita Federal. Use consultar_cnpj com o CNPJ específico."
-            )
-        }
-    ]
+    return {
+        "suportado": False,
+        "status": "busca_por_nome_indisponivel",
+        "nome": nome,
+        "uf": uf,
+        "resultados": [],
+        "motivo": (
+            "A busca por nome de empresa requer APIs pagas ou o portal da Receita "
+            "Federal; as fontes públicas gratuitas usadas aqui não oferecem esse recurso."
+        ),
+        "alternativa": "Obtenha o CNPJ por outra fonte e use consultar_cnpj.",
+    }
