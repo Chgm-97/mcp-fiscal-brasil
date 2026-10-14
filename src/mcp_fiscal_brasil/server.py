@@ -51,6 +51,7 @@ from .nfe.tools import (
     validar_chave_nfe,
 )
 from .nfse.tools import consultar_nfse
+from .shared.annotations import instalar_anotacoes
 from .shared.validators import normalizar_cnpj, validate_cnpj_qualquer
 from .simples.tools import consultar_simples_nacional
 from .sped.tools import analisar_sped, listar_registros_sped
@@ -109,6 +110,9 @@ app = FastMCP(
         "Dados obtidos de fontes públicas: BrasilAPI, ReceitaWS, SEFAZ."
     ),
 )
+
+# Injeta readOnlyHint/destructiveHint/openWorldHint em todas as ferramentas.
+instalar_anotacoes(app)
 
 
 @app.custom_route("/health", methods=["GET"], include_in_schema=False)

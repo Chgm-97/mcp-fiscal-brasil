@@ -4,7 +4,7 @@ import logging
 import unicodedata
 
 from mcp_fiscal_brasil.nfse.client import NFSeNacionalClient, NFSeNacionalUnavailableError
-from mcp_fiscal_brasil.shared.validators import validate_cnpj
+from mcp_fiscal_brasil.shared.validators import normalizar_cnpj, validate_cnpj_qualquer
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,9 @@ def _normalizar_chave_municipio(municipio: str) -> str:
 def _validar_cnpj_prestador(cnpj_prestador: str | None) -> str | None:
     if cnpj_prestador is None:
         return None
-    if not validate_cnpj(cnpj_prestador):
+    if not validate_cnpj_qualquer(cnpj_prestador):
         raise ValueError("cnpj_prestador inválido")
-    return "".join(char for char in cnpj_prestador if char.isdigit())
+    return normalizar_cnpj(cnpj_prestador)
 
 
 async def consultar_nfse(

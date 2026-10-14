@@ -1,7 +1,7 @@
 """Ferramentas MCP para certidões negativas de débito."""
 
 from ..shared.exceptions import ValidationError
-from ..shared.validators import validate_cnpj, validate_cpf
+from ..shared.validators import normalizar_cnpj, validate_cnpj_qualquer, validate_cpf
 
 
 async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
@@ -20,17 +20,19 @@ async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
     Raises:
         ValidationError: Se o CNPJ/CPF for inválido.
     """
-    digitos = "".join(c for c in cnpj_cpf if c.isdigit())
+    # normalizar_cnpj preserva letras (CNPJ alfanumerico, IN RFB 2.229/2024);
+    # um filtro isdigit() descartaria as letras e reprovaria CNPJs validos.
+    documento = normalizar_cnpj(cnpj_cpf)
 
-    if len(digitos) == 14:
-        if not validate_cnpj(cnpj_cpf):
+    if len(documento) == 14:
+        if not validate_cnpj_qualquer(cnpj_cpf):
             raise ValidationError("cnpj", cnpj_cpf, "CNPJ inválido")
         tipo_doc = "CNPJ"
         url_emissao = "https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PJ/Emitir"
         url_verificacao = (
             "https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PJ/Verificar"
         )
-    elif len(digitos) == 11:
+    elif len(documento) == 11 and documento.isdigit():
         if not validate_cpf(cnpj_cpf):
             raise ValidationError("cpf", cnpj_cpf, "CPF inválido")
         tipo_doc = "CPF"
@@ -40,7 +42,9 @@ async def consultar_certidao_federal(cnpj_cpf: str) -> dict[str, str]:
         )
     else:
         raise ValidationError(
-            "cnpj_cpf", cnpj_cpf, "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)"
+            "cnpj_cpf",
+            cnpj_cpf,
+            "Informe um CPF (11 dígitos) ou CNPJ (14 caracteres, numérico ou alfanumérico)",
         )
 
     return {
@@ -78,7 +82,7 @@ async def consultar_certidao_fgts(cnpj: str) -> dict[str, str]:
     Raises:
         ValidationError: Se o CNPJ for inválido.
     """
-    if not validate_cnpj(cnpj):
+    if not validate_cnpj_qualquer(cnpj):
         raise ValidationError("cnpj", cnpj, "CNPJ inválido")
 
     return {

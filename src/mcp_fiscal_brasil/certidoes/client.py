@@ -1,4 +1,5 @@
 from mcp_fiscal_brasil.cpf.client import validate_cpf
+from mcp_fiscal_brasil.shared.validators import normalizar_cnpj
 
 from .schemas import CertidaoURL
 
@@ -10,7 +11,8 @@ def validate_cpf_for_certificate(cpf: str) -> bool:
 
 def get_pgfn_url(cpf_or_cnpj: str) -> CertidaoURL:
     """Gera a URL para consulta da Certidão Conjunta (Receita Federal/PGFN)."""
-    clean_doc = "".join(c for c in cpf_or_cnpj if c.isdigit())
+    # Preserva letras: CNPJ alfanumerico tem 14 caracteres, CPF tem 11.
+    clean_doc = normalizar_cnpj(cpf_or_cnpj)
     if len(clean_doc) > 11:
         url = "https://solucoes.receita.fazenda.gov.br/Servicos/certidaointernet/PJ/Emitir"
     else:
